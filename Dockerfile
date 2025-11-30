@@ -18,8 +18,8 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Install Prisma CLI (if needed)
-RUN pnpm add -g prisma
+# Install Prisma CLI locally (not globally)
+RUN pnpm add prisma
 
 # Generate Prisma client (if using Prisma)
 RUN npx prisma generate
