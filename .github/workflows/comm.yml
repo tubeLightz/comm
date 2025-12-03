@@ -1,0 +1,67 @@
+name: Comm Service CI/CD
+on:
+  push:
+    branches: [main]
+    paths: ['comm/**']
+  pull_request:
+    paths: ['comm/**']
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: 'comm/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        working-directory: comm
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: comm
+        run: pnpm run lint
+
+      - name: Build
+        working-directory: comm
+        run: pnpm run build
+
+      - name: Build and push Docker image
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: comm
+          push: true
+          tags: ${{ secrets.DOCKER_REGISTRY }}/zia-comm:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to VPS
+        if: github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /var/www/zia-comm
+            docker pull ${{ secrets.DOCKER_REGISTRY }}/zia-comm:latest
+            docker-compose down
+            docker-compose up -d
+
+      - name: Reload Nginx
+        if: github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: sudo systemctl reload nginx
