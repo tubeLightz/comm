@@ -2,9 +2,7 @@ name: Comm Service CI/CD
 on:
   push:
     branches: [main]
-    paths: ['comm/**']
   pull_request:
-    paths: ['comm/**']
 
 jobs:
   build-and-deploy:
@@ -20,29 +18,38 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
-          cache-dependency-path: 'comm/pnpm-lock.yaml'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
-        working-directory: comm
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        working-directory: comm
         run: pnpm run lint
 
       - name: Build
-        working-directory: comm
         run: pnpm run build
+
+      - name: Debug secrets
+        run: |
+          echo "Registry: ${{ secrets.DOCKER_REGISTRY }}"
+          echo "Username: ${{ secrets.DOCKER_USERNAME }}"
+          echo "Host: ${{ secrets.VPS_HOST }}"
+          echo "User: ${{ secrets.VPS_USER }}"
+
+      - name: Log in to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image
         if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
-          context: comm
+          context: .
           push: true
           tags: ${{ secrets.DOCKER_REGISTRY }}/zia-comm:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Deploy to VPS
         if: github.ref == 'refs/heads/main'
