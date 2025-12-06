@@ -86,4 +86,5 @@ dist
 .vscode/
 
 # Mac
-.DS_Store
+.DS_Store.env.production
+.env.production
